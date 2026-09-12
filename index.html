@@ -2,11 +2,34 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <title>B1/B2 Vocabulary Splitter, Cleaner, Merger & Validator (Zero Data Loss)</title>
+    <title>B1/B2 Vocabulary Splitter, Cleaner, Merger & Field Extractor</title>
     <style>
+        /* KIỂU DÁNG TOAST NOTIFICATION MỚI */
+        #toast-notification {
+            position: fixed;
+            bottom: 25px;
+            right: 25px;
+            background: #1e293b;
+            color: #f8fafc;
+            padding: 12px 20px;
+            border-radius: 10px;
+            border: 1px solid #38bdf8;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            font-size: 13px;
+            z-index: 9999;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            pointer-events: none;
+        }
+        #toast-notification.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f172a; color: #f8fafc; padding: 20px; max-width: 1200px; margin: 0 auto; }
         h2 { color: #38bdf8; margin-top: 0; text-align: center; }
-        textarea { width: 100%; height: 220px; background: #1e293b; color: #fff; border: 1px solid #475569; border-radius: 8px; padding: 12px; box-sizing: border-box; font-family: monospace; font-size: 13px; line-height: 1.4; resize: vertical; }
+        textarea { width: 100%; height: 200px; background: #1e293b; color: #fff; border: 1px solid #475569; border-radius: 8px; padding: 12px; box-sizing: border-box; font-family: monospace; font-size: 13px; line-height: 1.4; resize: vertical; }
         .btn-group { display: flex; gap: 10px; flex-wrap: wrap; margin: 10px 0; }
         button { background: #0284c7; color: white; border: none; padding: 10px 16px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 13px; transition: background 0.2s; }
         button:hover { background: #0369a1; }
@@ -47,23 +70,33 @@
         pre.json-preview { background: #090d16; padding: 8px; border-radius: 6px; color: #38bdf8; font-size: 11px; max-height: 150px; overflow: auto; margin-top: 5px; }
         
         .mode-select { background: #0f172a; border: 1px solid #38bdf8; color: #38bdf8; padding: 8px 12px; border-radius: 8px; font-size: 12px; margin-bottom: 10px; display: flex; align-items: center; gap: 10px; }
+        
+        .field-selector { display: flex; gap: 12px; flex-wrap: wrap; background: #0f172a; padding: 10px; border-radius: 8px; border: 1px solid #334155; margin-bottom: 10px; font-size: 12px; }
+        .field-selector label { cursor: pointer; display: flex; align-items: center; gap: 4px; color: #e2e8f0; }
+        .field-selector label:hover { color: #38bdf8; }
+        table.noun-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }
+        table.noun-table th, table.noun-table td { border: 1px solid #475569; padding: 8px; text-align: left; }
+        table.noun-table th { background: #334155; color: #38bdf8; }
+        
+        /* CSS CHO KHU VỰC CHIA LÔ */
+        .batch-card { background: #0f172a; border: 1px solid #475569; padding: 12px; border-radius: 8px; margin-bottom: 12px; }
     </style>
 </head>
 <body>
 
-    <h2>🧹 Công cụ Tách, Lọc Trùng, Kiểm Lỗi & Hợp Nhất JSON (Bảo Vệ Dữ Liệu 100%)</h2>
+    <h2>🧹 Công cụ Tách, Lọc Trùng, Trích Xuất Trường & Hợp Nhất JSON</h2>
 
-    <!-- Ô NHẬP LIỆU BAN ĐẦU -->
+    <!-- Ô 1: NHẬP LIỆU BAN ĐẦU -->
     <div class="box">
         <label style="font-weight: bold; color: #94a3b8; display: block; margin-bottom: 8px;">1. Dán văn bản hỗn hợp (Chat AI, Code HTML, JSON...) vào đây để phân tách:</label>
         <textarea id="raw-input" placeholder="Dán đoạn chat hoặc file chứa hỗn hợp lời thoại, mã code và JSON vào đây..."></textarea>
         <div class="btn-group">
-            <button onclick="splitContent()">⚡ 1. Tách Tự Động Vào 2 Khung</button>
+            <button onclick="splitContent()">⚡ 1. Tách Tự Động Vào Khung 1 & Khung 2</button>
             <button class="secondary" onclick="clearAll()">🗑️ Xóa Hết Ô Nhập</button>
         </div>
     </div>
 
-    <!-- GIAO DIỆN 2 KHUNG TÁCH BIỆT -->
+    <!-- GIAO DIỆN 2 KHUNG TÁCH BIỆT (KHUNG 1 & KHUNG 2) -->
     <div class="split-grid">
         <!-- KHUNG 1: JSON -->
         <div class="box" style="margin-bottom: 0;">
@@ -71,20 +104,20 @@
                 <label style="font-weight: bold; color: #38bdf8;">📦 Khung 1: Dữ Liệu JSON Từ Vựng</label>
                 <div style="display: flex; gap: 6px; flex-wrap: wrap;">
                     <button class="green" onclick="cleanAndSortJSON(false)" style="padding: 6px 10px; font-size: 12px;">🧹 Lọc Trùng & Sắp Xếp</button>
-                    <button class="purple" onclick="validateDataset()" style="padding: 6px 10px; font-size: 12px;">🔍 Kiểm Tra Toàn Bộ Lỗi</button>
+                    <button class="purple" onclick="validateDataset()" style="padding: 6px 10px; font-size: 12px;">🔍 Kiểm Tra Lỗi</button>
                 </div>
             </div>
 
             <div class="mode-select">
                 <input type="checkbox" id="strict-mode-check" checked style="cursor: pointer;">
                 <label for="strict-mode-check" style="cursor: pointer;">
-                    <b>Chế độ An Toàn Cao:</b> Phân biệt từ trùng theo cả <code>word + ans + level + lek</code> (Tránh xóa nhầm từ ở bài học khác).
+                    <b>Chế độ An Toàn Cao:</b> Phân biệt từ trùng theo cả <code>word + ans + level + lek</code>
                 </label>
             </div>
 
             <textarea id="json-box" style="height: 300px;" placeholder="Chứa mảng JSON từ vựng..."></textarea>
             <div class="btn-group" style="margin-bottom: 0;">
-                <button class="secondary" onclick="copyText('json-box')">📋 Copy JSON</button>
+                <button class="secondary" onclick="copyText('json-box')">📋 Copy JSON Khung 1</button>
             </div>
         </div>
 
@@ -101,14 +134,54 @@
         </div>
     </div>
 
-    <!-- KHU VỰC NÚT BẤM BÁO CÁO & PHÂN LOẠI -->
+    <!-- KHU VỰC TÁCH TRƯỜNG & CHIA LÔ (ĐẶT NGAY DƯỚI KHUNG 1) -->
+    <div class="box" style="background: #0f172a; border-color: #38bdf8;">
+        <h3 style="margin-top:0; color:#38bdf8; font-size: 15px;">🎯 Tách Trường & Chia Lô Gửi AI (Batch Splitter):</h3>
+        <p style="font-size: 12px; color: #94a3b8; margin-bottom: 8px;">Chọn trường cần trích xuất ở Khung 1, sau đó bấm chia lô để lấy các đoạn nhỏ gửi cho AI xử lý.</p>
+        
+        <div class="field-selector">
+            <label><input type="checkbox" class="field-chk" value="word" checked disabled> word (Bắt buộc)</label>
+            <label><input type="checkbox" class="field-chk" value="ans" checked> ans</label>
+            <label><input type="checkbox" class="field-chk" value="type"> type</label>
+            <label><input type="checkbox" class="field-chk" value="dong_nghia_b1" checked> dong_nghia_b1</label>
+            <label><input type="checkbox" class="field-chk" value="dong_nghia_b2" checked> dong_nghia_b2</label>
+            <label><input type="checkbox" class="field-chk" value="giai_thich_dong_nghia" checked> giai_thich_dong_nghia</label>
+            <label><input type="checkbox" class="field-chk" value="ant" checked> ant</label>
+            <label><input type="checkbox" class="field-chk" value="vnword"> vnword</label>
+        </div>
+        
+        <div class="btn-group" style="align-items: center;">
+            <button class="purple" onclick="extractSelectedFields()">⚡ 1. Tách Trường Chọn Lọc (Ô Trái)</button>
+            <div style="display: flex; align-items: center; gap: 6px; margin-left: auto; font-size: 12px; color: #cbd5e1;">
+                <span>Số từ/lô:</span>
+                <input type="number" id="batch-size-input" value="25" min="5" max="100" style="width: 60px; background: #1e293b; color: #fff; border: 1px solid #475569; padding: 6px; border-radius: 6px; text-align: center;">
+                <button class="green" onclick="generateBatches()">📦 2. Chia Lô Gửi AI</button>
+            </div>
+            <button class="orange" onclick="checkMissingPlurals()">📋 Kiểm Tra Danh Từ Thiếu Số Nhiều</button>
+        </div>
+
+        <div class="split-grid" style="margin-top: 10px; margin-bottom: 10px;">
+            <div>
+                <label style="font-size: 12px; color: #38bdf8; font-weight: bold;">⬅️ Dữ liệu đã tách (Toàn bộ):</label>
+                <textarea id="extracted-box" style="height: 220px; margin-top: 4px;" placeholder="Kết quả trích xuất sẽ nằm ở đây..."></textarea>
+                <button class="green" onclick="copyText('extracted-box')" style="margin-top: 6px; width: 100%;">📋 Copy Toàn Bộ Dữ Liệu Đã Tách</button>
+            </div>
+            <div>
+                <label style="font-size: 12px; color: #4ade80; font-weight: bold;">➡️ Dán dữ liệu AI đã sửa vào đây:</label>
+                <textarea id="patch-input-box" style="height: 220px; margin-top: 4px;" placeholder="Dán đoạn JSON mà AI đã bổ sung/sửa đổi vào đây..."></textarea>
+                <button class="purple" onclick="applyPatchToMainJSON()" style="margin-top: 6px; width: 100%;">🔄 Hợp Nhất Cập Nhật Trực Tiếp Vào Khung 1</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- KHU VỰC BÁO CÁO & PHÂN LOẠI -->
     <div id="stats-section" class="box" style="display: none; background: #0f172a;">
         <div id="dedup-alert" class="alert-box"></div>
         <div id="parse-error-alert" class="alert-box danger" style="display: none;"></div>
         
-        <h3 style="margin-top:0; color:#38bdf8; font-size: 15px;">🔍 Nút bấm kiểm tra nhanh theo loại lỗi:</h3>
+        <h3 style="margin-top:0; color:#38bdf8; font-size: 15px;">🔍 Kiểm tra nhanh theo loại lỗi:</h3>
         <div class="btn-group" style="margin-bottom: 15px;">
-            <button id="btn-parse-err" class="red" onclick="showParseErrorsList()" style="display:none;">❌ 0 Đoạn JSON Lỗi Cú Pháp</button>
+            <button id="btn-parse-err" class="red" onclick="showParseErrorsList()" style="display:none;">❌ 0 Lỗi Cú Pháp</button>
             <button id="btn-dup" class="orange" onclick="cleanAndSortJSON(false)" style="display:none;">📋 0 Từ Trùng</button>
             <button id="btn-vn" class="red" onclick="showVnErrorsList()" style="display:none;">⚠️ 0 Lỗi Tiếng Việt</button>
             <button id="btn-missing" class="purple" onclick="showMissingFieldsList()" style="display:none;">⚠️ 0 Từ Thiếu Trường</button>
@@ -118,7 +191,7 @@
         <div id="stats-container" class="stats-grid"></div>
     </div>
 
-    <!-- KHU VỰC HỢP NHẤT -->
+    <!-- KHU VỰC HỢP NHẤT TỔNG THỂ -->
     <div class="box">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
             <label style="font-weight: bold; color: #4ade80;">🔄 3. Kết Quả Hợp Nhất Hoàn Chỉnh (Khung 1 + Khung 2):</label>
@@ -130,7 +203,7 @@
         <textarea id="merged-box" style="height: 250px;" readonly placeholder="Sau khi bấm 'Hợp Nhất Ngay', đoạn văn bản/code hoàn chỉnh sẽ xuất hiện ở đây..."></textarea>
     </div>
 
-    <!-- MODAL HIỂN THỊ CHI TIẾT -->
+    <!-- MODAL HIỂN THỊ CHI TIẾT & CHIA LÔ -->
     <div id="detail-modal" class="modal">
         <div class="modal-content">
             <span class="close-btn" onclick="closeModal()">&times;</span>
@@ -138,6 +211,9 @@
             <div id="modal-body"></div>
         </div>
     </div>
+
+    <!-- KHUNG HIỂN THỊ THÔNG BÁO NHẸ NHÀNG (TOAST) -->
+    <div id="toast-notification"></div>
 
 <script>
     window.duplicateLog = [];
@@ -148,24 +224,40 @@
     window.nonDuplicateItems = [];
     window.totalOriginalCount = 0;
 
-    // --- 1. TÁCH DỮ LIỆU TỰ ĐỘNG LỌC CSS/JS ---
+    // --- HÀM TOAST THAY THẾ ALERT ---
+    function showToast(message, isError = false) {
+        let toast = document.getElementById('toast-notification');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.id = 'toast-notification';
+            document.body.appendChild(toast);
+        }
+        
+        toast.innerText = message;
+        toast.style.borderColor = isError ? '#ef4444' : '#38bdf8';
+        toast.style.background = isError ? '#7f1d1d' : '#1e293b';
+        toast.classList.add('show');
+        
+        if (window.toastTimeout) clearTimeout(window.toastTimeout);
+        window.toastTimeout = setTimeout(() => {
+            toast.classList.remove('show');
+        }, 3000);
+    }
+
+    // --- 1. TÁCH DỮ LIỆU TỰ ĐỘNG ---
     function splitContent() {
         const raw = document.getElementById('raw-input').value.trim();
-        if (!raw) return alert("Vui lòng dán văn bản vào ô số 1!");
+        if (!raw) return showToast("Vui lòng dán văn bản vào ô số 1!", true);
 
         window.parseErrorsLog = [];
         let extractedObjects = [];
 
-        // ƯU TIÊN 1: Tìm mảng data = [...] trong mã JS/HTML
         let dataArrayRegex = /(?:const|let|var)\s+data\s*=\s*(\[\s*\{[\s\S]*?\}\s*\])\s*;/i;
         let dataMatch = raw.match(dataArrayRegex);
 
         if (dataMatch) {
             let jsonString = dataMatch[1];
-            
-            let fixedJsonString = jsonString
-                .replace(/\}\s*\{/g, '},\n{')
-                .replace(/,\s*\]/g, ']');
+            let fixedJsonString = jsonString.replace(/\}\s*\{/g, '},\n{').replace(/,\s*\]/g, ']');
 
             try {
                 let parsed = JSON.parse(fixedJsonString);
@@ -182,7 +274,6 @@
             }
         }
 
-        // ƯU TIÊN 2: Tìm khối ```json ... ``` trong đoạn chat Markdown
         let jsonBlockRegex = /```json\s*([\s\S]*?)\s*```/gi;
         let match;
         let hasMarkdown = false;
@@ -210,7 +301,6 @@
             return;
         }
 
-        // ƯU TIÊN 3: Quét từng đối tượng { ... } từ vựng độc lập
         let depth = 0;
         let startIdx = -1;
         let inString = false;
@@ -232,7 +322,6 @@
                     depth--;
                     if (depth === 0 && startIdx !== -1) {
                         let objStr = raw.substring(startIdx, i + 1);
-
                         let isCSSorJS = /(--[\w-]+|font-family|display:|padding:|margin:|border:|background:|function|document\.|window\.|const |let |return )/i.test(objStr);
                         let isVocabCandidate = /("word"|"ans"|"vnword"|"b1_ex"|"vnans")/i.test(objStr);
 
@@ -277,61 +366,205 @@
             document.getElementById('json-box').value = "[]";
             document.getElementById('text-box').value = raw;
             if (window.parseErrorsLog.length > 0) {
-                alert(`❌ Phát hiện ${window.parseErrorsLog.length} đối tượng từ vựng bị lỗi cú pháp. Vui lòng kiểm tra báo cáo lỗi!`);
+                showToast(`Phát hiện ${window.parseErrorsLog.length} đối tượng bị lỗi cú pháp.`, true);
                 updateParseErrorAlert();
             } else {
-                alert("⚠️ Không tìm thấy đối tượng JSON từ vựng nào hợp lệ.");
+                showToast("Không tìm thấy đối tượng JSON từ vựng nào hợp lệ.", true);
             }
         }
     }
 
     function showExtractionSummary(successCount) {
-        let msg = `✨ Đã bóc tách thành công ${successCount} từ vựng vào Khung 1!`;
+        let msg = `✨ Đã bóc tách thành công ${successCount} từ vựng!`;
         if (window.parseErrorsLog.length > 0) {
-            msg += `\n⚠️ Có ${window.parseErrorsLog.length} từ vựng bị lỗi cú pháp JSON. Bấm nút đỏ bên dưới để xem chi tiết.`;
+            msg += ` (Có ${window.parseErrorsLog.length} lỗi)`;
         }
-        alert(msg);
+        showToast(msg);
         updateParseErrorAlert();
     }
 
-    function updateParseErrorAlert() {
-        const btnParseErr = document.getElementById('btn-parse-err');
-        const alertBox = document.getElementById('parse-error-alert');
-        
-        if (window.parseErrorsLog.length > 0) {
-            btnParseErr.innerText = `❌ ${window.parseErrorsLog.length} Từ Vựng Bị Lỗi Cú Pháp`;
-            btnParseErr.style.display = 'inline-block';
-            alertBox.style.display = 'block';
-            alertBox.innerHTML = `⚠️ Phát hiện <b>${window.parseErrorsLog.length}</b> từ vựng bị lỗi cú pháp JSON (do sai dấu ngoặc, thiếu phẩy...). Những từ này đang nằm trong danh sách lỗi để sửa.`;
-            document.getElementById('stats-section').style.display = 'block';
-        } else {
-            btnParseErr.style.display = 'none';
-            alertBox.style.display = 'none';
+    // --- 2. TÁCH TRƯỜNG & CHIA LÔ GỬI AI ---
+    function extractSelectedFields() {
+        const jsonText = document.getElementById('json-box').value.trim();
+        if (!jsonText) return showToast("Khung 1 (JSON) đang trống!", true);
+
+        let data = [];
+        try {
+            data = JSON.parse(jsonText);
+            if (!Array.isArray(data)) throw new Error();
+        } catch(e) {
+            return showToast("Khung 1 chứa dữ liệu JSON không hợp lệ!", true);
         }
+
+        const selectedFields = Array.from(document.querySelectorAll('.field-chk:checked')).map(cb => cb.value);
+
+        const extracted = data.map(item => {
+            let filteredObj = { word: item.word || "" };
+            selectedFields.forEach(f => {
+                if (item[f] !== undefined) filteredObj[f] = item[f];
+            });
+            return filteredObj;
+        });
+
+        document.getElementById('extracted-box').value = JSON.stringify(extracted, null, 2);
+        showToast(`✨ Đã trích xuất ${extracted.length} từ vựng sang Ô Trái!`);
     }
 
-    function showParseErrorsList() {
-        if (window.parseErrorsLog.length === 0) return alert("Không có đoạn JSON nào bị lỗi cú pháp!");
-        let html = `<p style="color:#f87171;">Dưới đây là <b>${window.parseErrorsLog.length}</b> từ vựng không thể đọc được do lỗi cú pháp:</p>`;
-        
-        window.parseErrorsLog.forEach((err, idx) => {
-            html += `<div class="dup-card">`;
-            html += `<h4 style="margin:0 0 6px 0; color:#f87171;">#${idx+1}. Lỗi: ${err.error}</h4>`;
-            html += `<pre class="json-preview" style="color:#fca5a5;">${err.snippet}</pre>`;
+    function generateBatches() {
+        const extractedStr = document.getElementById('extracted-box').value.trim();
+        if (!extractedStr) {
+            // Nếu chưa bấm tách trường, tự động tách ngầm luôn
+            extractSelectedFields();
+        }
+
+        const textToBatch = document.getElementById('extracted-box').value.trim();
+        if (!textToBatch) return showToast("Không có dữ liệu để chia lô!", true);
+
+        let data = [];
+        try {
+            data = JSON.parse(textToBatch);
+            if (!Array.isArray(data)) throw new Error();
+        } catch(e) {
+            return showToast("Dữ liệu trích xuất không hợp lệ để chia lô!", true);
+        }
+
+        const batchSize = parseInt(document.getElementById('batch-size-input').value) || 25;
+        let batches = [];
+
+        for (let i = 0; i < data.length; i += batchSize) {
+            batches.push(data.slice(i, i + batchSize));
+        }
+
+        let html = `<p style="color:#facc15; margin-bottom:12px;">📦 Tổng số: <b>${data.length}</b> từ được chia thành <b>${batches.length}</b> lô (Mỗi lô tối đa ${batchSize} từ):</p>`;
+
+        batches.forEach((batchData, idx) => {
+            let batchJsonStr = JSON.stringify(batchData, null, 2);
+            let areaId = `batch_textarea_${idx}`;
+            html += `<div class="batch-card">`;
+            html += `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">`;
+            html += `<b style="color:#38bdf8;">Lô #${idx + 1} (${batchData.length} từ)</b>`;
+            html += `<button class="green" style="padding:4px 10px; font-size:11px;" onclick="copyBatchText('${areaId}')">📋 Copy Lô #${idx + 1}</button>`;
+            html += `</div>`;
+            html += `<textarea id="${areaId}" style="height:120px; font-size:11px;">${batchJsonStr}</textarea>`;
             html += `</div>`;
         });
 
-        document.getElementById('modal-title').innerText = `❌ Danh Sách Từ Vựng Lỗi Cú Pháp`;
+        document.getElementById('modal-title').innerText = `📦 Công Cụ Chia Lô Gửi AI (${batches.length} Lô)`;
         document.getElementById('modal-body').innerHTML = html;
         document.getElementById('detail-modal').style.display = 'block';
     }
 
-    // --- 2. HỢP NHẤT DỮ LIỆU ---
+    function copyBatchText(elementId) {
+        const el = document.getElementById(elementId);
+        if (!el) return;
+        el.select();
+        navigator.clipboard.writeText(el.value);
+        showToast("📋 Đã copy nội dung lô vào khay nhớ tạm!");
+    }
+
+    function applyPatchToMainJSON() {
+        const mainJsonStr = document.getElementById('json-box').value.trim();
+        const patchJsonStr = document.getElementById('patch-input-box').value.trim();
+
+        if (!mainJsonStr) return showToast("Khung 1 (JSON gốc) đang trống!", true);
+        if (!patchJsonStr) return showToast("Vui lòng dán dữ liệu AI đã sửa vào Ô bên phải!", true);
+
+        let mainData = [], patchData = [];
+        try {
+            mainData = JSON.parse(mainJsonStr);
+            patchData = JSON.parse(patchJsonStr);
+            if (!Array.isArray(mainData) || !Array.isArray(patchData)) throw new Error();
+        } catch(e) {
+            return showToast("Dữ liệu không phải mảng JSON hợp lệ!", true);
+        }
+
+        let updatedCount = 0;
+
+        patchData.forEach(patchItem => {
+            if (!patchItem.word) return;
+
+            let rawWordBase = patchItem.word.split(',')[0].trim().toLowerCase();
+
+            let targetIndex = mainData.findIndex(mainItem => {
+                let mainWordBase = (mainItem.word || '').split(',')[0].trim().toLowerCase();
+                
+                if (patchItem.ans && mainItem.ans) {
+                    return mainWordBase === rawWordBase && mainItem.ans.trim().toLowerCase() === patchItem.ans.trim().toLowerCase();
+                }
+                return mainWordBase === rawWordBase;
+            });
+
+            if (targetIndex !== -1) {
+                for (let key in patchItem) {
+                    if (patchItem[key] !== undefined && patchItem[key] !== null) {
+                        mainData[targetIndex][key] = patchItem[key];
+                    }
+                }
+                updatedCount++;
+            }
+        });
+
+        document.getElementById('json-box').value = JSON.stringify(mainData, null, 2);
+        showToast(`🎉 Đã cập nhật thành công ${updatedCount}/${patchData.length} từ vào Khung 1!`);
+    }
+
+    function checkMissingPlurals() {
+        const jsonText = document.getElementById('json-box').value.trim();
+        if (!jsonText) return showToast("Khung 1 (JSON) đang trống!", true);
+
+        let data = [];
+        try {
+            data = JSON.parse(jsonText);
+            if (!Array.isArray(data)) throw new Error();
+        } catch(e) {
+            return showToast("Khung 1 chứa dữ liệu JSON không hợp lệ!", true);
+        }
+
+        let missingPluralNouns = [];
+
+        data.forEach(item => {
+            const isNoun = (item.type && item.type.toLowerCase().includes('nomen')) || 
+                           (item.word && /^(der|die|das)\s+/i.test(item.word.trim()));
+
+            if (isNoun) {
+                const wordHasPlural = item.word.includes(',') || item.word.includes('Pl.');
+                const formsHasPlural = item.forms && (item.forms.includes('die ') || item.forms.includes('Pl.'));
+
+                if (!wordHasPlural && !formsHasPlural) {
+                    missingPluralNouns.push({
+                        word: item.word || '',
+                        type: item.type || 'Nomen',
+                        forms: item.forms || '',
+                        vnword: item.vnword || ''
+                    });
+                }
+            }
+        });
+
+        if (missingPluralNouns.length === 0) {
+            showToast("🎉 Tất cả danh từ đều đã có dạng số nhiều đầy đủ!");
+            return;
+        }
+
+        let tableHtml = `<p style="color:#facc15;">Phát hiện <b>${missingPluralNouns.length}</b> danh từ chưa có thông tin số nhiều:</p>`;
+        tableHtml += `<table class="noun-table"><thead><tr><th>STT</th><th>Từ Gốc (Word)</th><th>Nghĩa Tiếng Việt</th><th>Forms Hiện Tại</th></tr></thead><tbody>`;
+        
+        missingPluralNouns.forEach((n, idx) => {
+            tableHtml += `<tr><td>${idx+1}</td><td><b>${n.word}</b></td><td>${n.vnword}</td><td>${n.forms || '<i>Trống</i>'}</td></tr>`;
+        });
+        tableHtml += `</tbody></table>`;
+
+        document.getElementById('modal-title').innerText = `📋 Danh Sách Danh Từ Cần Bổ Sung Số Nhiều (${missingPluralNouns.length})`;
+        document.getElementById('modal-body').innerHTML = tableHtml;
+        document.getElementById('detail-modal').style.display = 'block';
+    }
+
+    // --- 3. HỢP NHẤT ---
     function mergeContent() {
         const jsonText = document.getElementById('json-box').value.trim();
         const codeText = document.getElementById('text-box').value.trim();
 
-        if (!jsonText && !codeText) return alert("Cả 2 khung đều đang trống!");
+        if (!jsonText && !codeText) return showToast("Cả 2 khung đều đang trống!", true);
 
         let formattedJSON = jsonText;
         try {
@@ -349,10 +582,10 @@
         }
 
         document.getElementById('merged-box').value = result;
-        alert("🎉 Đã hợp nhất Khung 1 và Khung 2 thành công!");
+        showToast("🎉 Đã hợp nhất Khung 1 và Khung 2 thành công!");
     }
 
-    // --- 3. SẮP XẾP & LỌC TRÙNG BẢO VỆ CẤP ĐỘ ---
+    // --- 4. SẮP XẾP & LỌC TRÙNG ---
     function getLevelRank(item) {
         const lvl = String(item.level || '').trim();
         if (lvl === "A1") return 10;
@@ -371,7 +604,6 @@
 
         if (lek === 'redemittel' || type.includes('redemittel')) return 990;
         if (lek === 'morong' || lek === 'advanced' || lek === '0') return 900;
-
         if (lek === 'a1') return 10;
         if (lek === 'a2') return 20;
         if (lek === 'b1') return 30;
@@ -380,7 +612,6 @@
 
         const numLek = parseInt(lek);
         if (!isNaN(numLek) && numLek > 0) return numLek;
-
         return 500;
     }
 
@@ -406,14 +637,14 @@
 
     function cleanAndSortJSON(autoApply = false) {
         const jsonStr = document.getElementById('json-box').value.trim();
-        if (!jsonStr) return alert("Ô JSON đang trống!");
+        if (!jsonStr) return showToast("Ô JSON đang trống!", true);
 
         let data = [];
         try {
             data = JSON.parse(jsonStr);
             if (!Array.isArray(data)) throw new Error();
         } catch(e) {
-            return alert("❌ Dữ liệu ở Khung 1 không phải là mảng JSON hợp lệ!");
+            return showToast("Dữ liệu ở Khung 1 không phải mảng JSON hợp lệ!", true);
         }
 
         const isStrictMode = document.getElementById('strict-mode-check').checked;
@@ -485,8 +716,7 @@
     function showDuplicateChoiceModal() {
         let keys = Object.keys(window.duplicateGroupsData);
         let html = `<p style="color:#facc15;">⚠️ Phát hiện <b>${keys.length}</b> nhóm từ trùng lặp cấu trúc.</p>`;
-        
-        html += `<button class="green" style="margin-bottom:15px; width:100%; padding:10px; font-size:14px;" onclick="confirmSelectedMergeOptions()">✅ Xác Nhận Gộp Tất Cả Theo Tùy Chọn Đã Chọn</button>`;
+        html += `<button class="green" style="margin-bottom:15px; width:100%; padding:10px; font-size:14px;" onclick="confirmSelectedMergeOptions()">✅ Xác Nhận Gộp Tất Cả theo Lựa Chọn</button>`;
 
         keys.forEach((uKey, idx) => {
             let group = window.duplicateGroupsData[uKey];
@@ -494,13 +724,13 @@
             html += `<h4 style="margin:0 0 6px 0; color:#38bdf8;">#${idx+1}. Từ: "${group.word}" - <i>ans: ${group.ans}</i> <span style="color:#f87171; font-weight:normal; font-size:12px;">(Trùng ${group.items.length} bản)</span></h4>`;
             
             html += `<label class="option-box" style="display:block;">`;
-            html += `<input type="radio" name="opt_group_${idx}" value="smart" checked> <b>[MẶC ĐỊNH] Gộp thông minh (Giữ lại tất cả trường dữ liệu)</b>`;
+            html += `<input type="radio" name="opt_group_${idx}" value="smart" checked> <b>[MẶC ĐỊNH] Gộp thông minh</b>`;
             html += `<pre class="json-preview">${JSON.stringify(group.smartMerged, null, 2)}</pre>`;
             html += `</label>`;
 
             group.items.forEach((item, itemIdx) => {
                 html += `<label class="option-box" style="display:block;">`;
-                html += `<input type="radio" name="opt_group_${idx}" value="${itemIdx}"> <b>Giữ riêng Bản #${itemIdx + 1}</b> (level: "${item.level || ''}", lek: "${item.lek !== undefined ? item.lek : ''}")`;
+                html += `<input type="radio" name="opt_group_${idx}" value="${itemIdx}"> <b>Giữ bản #${itemIdx + 1}</b> (level: "${item.level || ''}", lek: "${item.lek !== undefined ? item.lek : ''}")`;
                 html += `<pre class="json-preview">${JSON.stringify(item, null, 2)}</pre>`;
                 html += `</label>`;
             });
@@ -508,7 +738,7 @@
             html += `</div>`;
         });
 
-        document.getElementById('modal-title').innerText = `🔍 Xem Trước & Lựa Chọn Phương Thức Gộp Từ Trùng`;
+        document.getElementById('modal-title').innerText = `🔍 Gộp Từ Trùng`;
         document.getElementById('modal-body').innerHTML = html;
         document.getElementById('detail-modal').style.display = 'block';
     }
@@ -532,7 +762,7 @@
 
         applyFinalCleanedData(finalCleaned);
         closeModal();
-        alert("✨ Đã áp dụng gộp thành công!");
+        showToast("✨ Đã áp dụng gộp thành công!");
     }
 
     function applyFinalCleanedData(uniqueData) {
@@ -551,7 +781,7 @@
 
         const numDupes = window.totalOriginalCount - uniqueData.length;
         document.getElementById('dedup-alert').innerHTML = 
-            `🎉 Đã xử lý thành công! Tổng ban đầu: <b>${window.totalOriginalCount}</b> từ ➔ Còn <b>${uniqueData.length}</b> từ duy nhất (Lọc bỏ ${numDupes} bản trùng).`;
+            `🎉 Đã xử lý thành công! Ban đầu: <b>${window.totalOriginalCount}</b> ➔ Còn <b>${uniqueData.length}</b> từ (Lọc bỏ ${numDupes} bản trùng).`;
 
         const btnDup = document.getElementById('btn-dup');
         if (window.duplicateLog.length > 0) {
@@ -577,7 +807,7 @@
         validateDataset(true);
     }
 
-    // --- 4. BỘ KIỂM TRA LỖI KÝ TỰ TIẾNG VIỆT ---
+    // --- 5. KIỂM TRA LỖI ---
     function sanitizeGermanText(text) {
         if (!text) return '';
         return text.replace(/\b(Café|Cafés|Exposé|Exposés|Résumé|Résumés|Varieté|Varietés|Cliché|Clichés|Touché|Fiancée|Séparée|Kommuniqué|Renommee)\b/gi, 'Cafe')
@@ -588,7 +818,7 @@
     function validateDataset(silent = false) {
         const jsonStr = document.getElementById('json-box').value.trim();
         if (!jsonStr) {
-            if (!silent) alert("Ô JSON đang trống!");
+            if (!silent) showToast("Ô JSON đang trống!", true);
             return;
         }
 
@@ -597,7 +827,7 @@
             data = JSON.parse(jsonStr);
             if (!Array.isArray(data)) throw new Error();
         } catch(e) {
-            if (!silent) alert("❌ Dữ liệu ở Khung 1 không phải là mảng JSON hợp lệ!");
+            if (!silent) showToast("Dữ liệu ở Khung 1 không phải mảng JSON hợp lệ!", true);
             return;
         }
 
@@ -659,19 +889,50 @@
 
         if (!silent) {
             if (window.vnErrorsLog.length === 0 && window.missingFieldsLog.length === 0) {
-                alert("🎉 Tuyệt vời! Không phát hiện lỗi tiếng Việt trong câu Đức hoặc thiếu trường dữ liệu nào.");
+                showToast("🎉 Tuyệt vời! Không phát hiện lỗi tiếng Việt hoặc thiếu trường.");
             } else {
-                alert(`⚠️ Kiểm tra hoàn tất:\n- Lỗi Tiếng Việt trong câu Đức: ${window.vnErrorsLog.length}\n- Từ thiếu trường dữ liệu: ${window.missingFieldsLog.length}`);
+                showToast(`Kiểm tra xong: ${window.vnErrorsLog.length} lỗi TV, ${window.missingFieldsLog.length} từ thiếu trường.`, true);
             }
         }
     }
 
-    // --- 5. HÀM HIỂN THỊ CÁC MODAL ---
+    function updateParseErrorAlert() {
+        const btnParseErr = document.getElementById('btn-parse-err');
+        const alertBox = document.getElementById('parse-error-alert');
+        
+        if (window.parseErrorsLog.length > 0) {
+            btnParseErr.innerText = `❌ ${window.parseErrorsLog.length} Từ Vựng Bị Lỗi Cú Pháp`;
+            btnParseErr.style.display = 'inline-block';
+            alertBox.style.display = 'block';
+            alertBox.innerHTML = `⚠️ Phát hiện <b>${window.parseErrorsLog.length}</b> từ vựng bị lỗi cú pháp JSON.`;
+            document.getElementById('stats-section').style.display = 'block';
+        } else {
+            btnParseErr.style.display = 'none';
+            alertBox.style.display = 'none';
+        }
+    }
+
+    function showParseErrorsList() {
+        if (window.parseErrorsLog.length === 0) return showToast("Không có đoạn JSON nào bị lỗi cú pháp!");
+        let html = `<p style="color:#f87171;">Dưới đây là <b>${window.parseErrorsLog.length}</b> từ vựng bị lỗi cú pháp:</p>`;
+        
+        window.parseErrorsLog.forEach((err, idx) => {
+            html += `<div class="dup-card">`;
+            html += `<h4 style="margin:0 0 6px 0; color:#f87171;">#${idx+1}. Lỗi: ${err.error}</h4>`;
+            html += `<pre class="json-preview" style="color:#fca5a5;">${err.snippet}</pre>`;
+            html += `</div>`;
+        });
+
+        document.getElementById('modal-title').innerText = `❌ Danh Sách Từ Vựng Lỗi Cú Pháp`;
+        document.getElementById('modal-body').innerHTML = html;
+        document.getElementById('detail-modal').style.display = 'block';
+    }
+
     function showVnErrorsList() {
-        if (!window.vnErrorsLog || window.vnErrorsLog.length === 0) return alert("Không có câu Đức nào dính Tiếng Việt!");
+        if (!window.vnErrorsLog || window.vnErrorsLog.length === 0) return showToast("Không có câu Đức nào dính Tiếng Việt!");
         let html = `<p>Phát hiện <b>${window.vnErrorsLog.length}</b> câu Tiếng Đức dính ký tự Tiếng Việt:</p><ul>`;
         window.vnErrorsLog.forEach(e => {
-            html += `<li><b>${e.word}</b> [<i>${e.field}</i>]: "${e.text}" <br><small style="color:#f87171;">➔ Ký tự Tiếng Việt phát hiện: <span class="hl-char">'${e.char}'</span></small></li>`;
+            html += `<li><b>${e.word}</b> [<i>${e.field}</i>]: "${e.text}" <br><small style="color:#f87171;">➔ Ký tự phát hiện: <span class="hl-char">'${e.char}'</span></small></li>`;
         });
         html += `</ul>`;
 
@@ -681,7 +942,7 @@
     }
 
     function showMissingFieldsList() {
-        if (!window.missingFieldsLog || window.missingFieldsLog.length === 0) return alert("Không có từ nào bị thiếu trường!");
+        if (!window.missingFieldsLog || window.missingFieldsLog.length === 0) return showToast("Không có từ nào bị thiếu trường!");
         let html = `<p>Danh sách <b>${window.missingFieldsLog.length}</b> từ bị thiếu thông tin bắt buộc:</p><ul>`;
         window.missingFieldsLog.forEach(e => {
             html += `<li><b>${e.word}</b>: Thiếu các trường <i>[${e.missing.join(', ')}]</i></li>`;
@@ -700,14 +961,26 @@
         document.getElementById('detail-modal').style.display = 'block';
     }
 
-    function closeModal() { document.getElementById('detail-modal').style.display = 'none'; }
+    function closeModal() { 
+        document.getElementById('detail-modal').style.display = 'none'; 
+    }
+
+    // Đóng Modal bằng phím ESC hoặc Click ra ngoài
+    document.addEventListener('keydown', function(event) {
+        if (event.key === "Escape") closeModal();
+    });
+
+    window.addEventListener('click', function(event) {
+        const modal = document.getElementById('detail-modal');
+        if (event.target === modal) closeModal();
+    });
 
     function copyText(id) {
         const el = document.getElementById(id);
-        if (!el.value.trim()) return alert("Không có nội dung để copy!");
+        if (!el.value.trim()) return showToast("Không có nội dung để copy!", true);
         el.select();
         navigator.clipboard.writeText(el.value);
-        alert("📋 Đã copy nội dung vào khay nhớ tạm!");
+        showToast("📋 Đã copy nội dung vào khay nhớ tạm!");
     }
 
     function clearAll() {
@@ -716,7 +989,10 @@
             document.getElementById('json-box').value = "";
             document.getElementById('text-box').value = "";
             document.getElementById('merged-box').value = "";
+            document.getElementById('extracted-box').value = "";
+            document.getElementById('patch-input-box').value = "";
             document.getElementById('stats-section').style.display = 'none';
+            showToast("Đã làm sạch các ô nhập liệu.");
         }
     }
 </script>
